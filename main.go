@@ -3,8 +3,8 @@ package main
 import (
 	"net/http"
 
+	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/labstack/echo/v4"
-	"github.com/Maxbrain0/echo_mongo/model/model"
 )
 
 func main() {
@@ -19,13 +19,13 @@ func helloWorld(c echo.Context) error {
 }
 
 func save(c echo.Context) error {
-	name := c.FormValue("name")
-	email := c.FormValue("email")
+	meat := c.FormValue("meat")
+	description := c.FormValue("description")
 
-	t := &Taco{
-		Type:        "Carnitas",
-		Description: "Succulent slow cooked pork that is subsequently fried! :)",
+	t := &model.Taco{
+		Meat:        meat,
+		Description: description,
 	}
 
-	return c.String(http.StatusOK, "name:"+name+", email:"+email)
+	return c.JSON(http.StatusOK, t)
 }
