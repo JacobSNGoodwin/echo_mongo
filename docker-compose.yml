@@ -4,6 +4,9 @@ services:
   mongo:
     image: mongo
     restart: always
+    volumes:
+      - /data/db
+      # try using anonymous volumes
     ports:
       - '27017:27017'
     environment:
