@@ -1,4 +1,4 @@
-module github.com/Maxbrain0/echo-mongo
+module github.com/Maxbrain0/echo_mongo
 
 go 1.12
 
