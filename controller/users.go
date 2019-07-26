@@ -1,27 +1,51 @@
 package controller
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Users holds reference to a database collection and is the receiver of various
 // endpoint controllers which will need mongoDB collection access
 type Users struct {
-	C *mongo.Collection
+	Collection *mongo.Collection
 }
 
 // CreateUser creates a user in mongo dB and returns a response on success
-func (users *Users) CreateUser(c echo.Context) error {
+func (user *Users) CreateUser(c echo.Context) error {
 	u := new(model.User)
 
 	if err := c.Bind(u); err != nil {
 		return err
 	}
 
-	println("User created!")
+	// make sure username and password are available
+	if len(u.UserName) < 1 || len(u.Password) < 1 {
+		return echo.NewHTTPError(http.StatusBadRequest, "Please provide a user name and password")
+	}
+
+	// attempt to insert into the database
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": u.Password})
+
+	//
+	if err != nil {
+		fmt.Println(err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
+	}
+
+	id := res.InsertedID
+
+	fmt.Println(id)
+
 	return c.JSON(http.StatusCreated, u)
 }

@@ -17,7 +17,7 @@ import (
 func main() {
 	// setup mongodB client
 	fmt.Println("Establishing connection to MongoDB...")
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://root:example@localhost:27017"))
 
 	if err != nil {
 		log.Fatal(err)
@@ -38,7 +38,7 @@ func main() {
 	// setup a users collection
 	userCollection := client.Database("foodie").Collection("users")
 
-	usersController := &controller.Users{C: userCollection}
+	usersController := &controller.Users{Collection: userCollection}
 
 	// setup echo instance and routes
 	// we wrap functions that need to pass the collection
