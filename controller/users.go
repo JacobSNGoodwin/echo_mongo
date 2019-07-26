@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
+
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson"
@@ -35,7 +37,7 @@ func (user *Users) CreateUser(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": u.Password})
+	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": u.Password, "email": u.Email})
 
 	//
 	if err != nil {
@@ -43,9 +45,14 @@ func (user *Users) CreateUser(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
 	}
 
-	id := res.InsertedID
+	oid := res.InsertedID.(primitive.ObjectID)
 
-	fmt.Println(id)
+	fmt.Println(oid)
 
-	return c.JSON(http.StatusCreated, u)
+	response := &model.User{
+		ID:       oid,
+		UserName: u.UserName,
+	}
+
+	return c.JSON(http.StatusCreated, response)
 }
