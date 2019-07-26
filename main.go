@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/Maxbrain0/echo_mongo/model"
+	"github.com/Maxbrain0/echo_mongo/controller"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -33,12 +32,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// might want to ping here to really make sure we're connected
 	fmt.Println("Successfully connected to MongoDB!")
 
+	// setup a users collection
+	userCollection := client.Database("foodie").Collection("users")
+
+	usersController := &controller.Users{C: userCollection}
+
 	// setup echo instance and routes
+	// we wrap functions that need to pass the collection
 	e := echo.New()
-	e.GET("/", helloWorld)
-	e.POST("/tacos", postTaco)
+	e.POST("/user", usersController.CreateUser)
 
 	// allows us to shut down server gracefully
 	go func() {
@@ -71,20 +76,4 @@ func main() {
 	}
 
 	fmt.Println("Succesfully Disconnect from MongoDB")
-}
-
-func helloWorld(c echo.Context) error {
-	return c.String(http.StatusOK, "Hello, World!")
-}
-
-func postTaco(c echo.Context) error {
-	meat := c.FormValue("meat")
-	description := c.FormValue("description")
-
-	t := &model.Taco{
-		Meat:        meat,
-		Description: description,
-	}
-
-	return c.JSON(http.StatusOK, t)
 }
