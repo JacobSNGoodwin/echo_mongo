@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/labstack/echo/v4"
@@ -37,7 +38,14 @@ func (user *Users) CreateUser(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": u.Password, "email": u.Email})
+	// Create a hashed password
+	hashedPW, err := bcrypt.GenerateFromPassword([]byte(u.Password), 14)
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
+	}
+
+	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": hashedPW, "email": u.Email})
 
 	//
 	if err != nil {
@@ -46,8 +54,6 @@ func (user *Users) CreateUser(c echo.Context) error {
 	}
 
 	oid := res.InsertedID.(primitive.ObjectID)
-
-	fmt.Println(oid)
 
 	response := &model.User{
 		ID:       oid,
