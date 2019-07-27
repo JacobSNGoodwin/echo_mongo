@@ -104,10 +104,8 @@ func (users *Users) Login(c echo.Context) error {
 	err = bcrypt.CompareHashAndPassword([]byte(respData.Password), []byte(u.Password))
 
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Not a valid user or password")
+		return echo.NewHTTPError(http.StatusOK, "Not a valid user or password")
 	}
 
-	fmt.Println("Successfully entered password!")
-
-	return nil
+	return c.JSON(http.StatusCreated, model.User{ID: respData.ID, UserName: respData.UserName})
 }
