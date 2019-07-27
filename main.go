@@ -18,6 +18,7 @@ import (
 var e *echo.Echo
 var userCollection *mongo.Collection
 var usersController *controller.Users
+var postsController *controller.Posts
 
 func main() {
 	// setup mongodB client
@@ -82,6 +83,13 @@ func main() {
 * Setup routes for echo rest api hear
  */
 func setupRoutes() {
+	// jwt middleware config
+	config := middleware.JWTConfig{
+		SigningKey:  []byte("secret"),
+		TokenLookup: "cookie:token",
+	}
+	jwtmw := middleware.JWTWithConfig(config)
+
 	// setup echo instance and routes
 
 	e = echo.New()
@@ -91,14 +99,7 @@ func setupRoutes() {
 	e.POST("/user", usersController.CreateUser)
 	e.POST("/login", usersController.Login)
 
-	// Put all user paths for editing posts in a group
-	// Only user can modify their posts
-	r := e.Group("/user")
+	// Must have authentication to create a post
+	e.POST("/post", postsController.CreatePost, jwtmw)
 
-	// set config to read cookie with auth token
-	config := middleware.JWTConfig{
-		SigningKey:  []byte("secret"),
-		TokenLookup: "cookie:token",
-	}
-	r.Use(middleware.JWTWithConfig(config))
 }
