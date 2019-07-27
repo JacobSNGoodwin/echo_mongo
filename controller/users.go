@@ -124,7 +124,15 @@ func (users *Users) Login(c echo.Context) error {
 		return err
 	}
 
+	cookie := new(http.Cookie)
+	cookie.Name = "token"
+	cookie.Value = t
+	cookie.Expires = time.Now().Add(24 * time.Hour)
+	cookie.HttpOnly = true
+
+	// send token in cookie with success message in JSON
+	c.SetCookie(cookie)
 	return c.JSON(http.StatusOK, map[string]string{
-		"token": t,
+		"message": "Login successful",
 	})
 }

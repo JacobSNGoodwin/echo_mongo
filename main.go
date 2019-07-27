@@ -10,6 +10,7 @@ import (
 
 	"github.com/Maxbrain0/echo_mongo/controller"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -43,8 +44,21 @@ func main() {
 	// setup echo instance and routes
 	// we wrap functions that need to pass the collection
 	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 	e.POST("/user", usersController.CreateUser)
 	e.POST("/login", usersController.Login)
+
+	// Put all user paths for editing posts in a group
+	// Only user can modify their posts
+	r := e.Group("/user")
+
+	// set config to read cookie with auth token
+	config := middleware.JWTConfig{
+		SigningKey:  []byte("secret"),
+		TokenLookup: "cookie:token",
+	}
+	r.Use(middleware.JWTWithConfig(config))
 
 	// allows us to shut down server gracefully
 	go func() {
@@ -56,7 +70,6 @@ func main() {
 	// Wait for Control C to exit - shut down mongo and server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
-
 	// Block until a signal is received
 	<-quit
 
