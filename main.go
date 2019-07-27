@@ -15,6 +15,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var e *echo.Echo
+var userCollection *mongo.Collection
+var usersController *controller.Users
+
 func main() {
 	// setup mongodB client
 	fmt.Println("Establishing connection to MongoDB...")
@@ -36,29 +40,10 @@ func main() {
 	// might want to ping here to really make sure we're connected
 	fmt.Println("Successfully connected to MongoDB!")
 
-	// setup a users collection
-	userCollection := client.Database("foodie").Collection("users")
+	userCollection = client.Database("foodie").Collection("users")
+	usersController = &controller.Users{Collection: userCollection}
 
-	usersController := &controller.Users{Collection: userCollection}
-
-	// setup echo instance and routes
-	// we wrap functions that need to pass the collection
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.POST("/user", usersController.CreateUser)
-	e.POST("/login", usersController.Login)
-
-	// Put all user paths for editing posts in a group
-	// Only user can modify their posts
-	r := e.Group("/user")
-
-	// set config to read cookie with auth token
-	config := middleware.JWTConfig{
-		SigningKey:  []byte("secret"),
-		TokenLookup: "cookie:token",
-	}
-	r.Use(middleware.JWTWithConfig(config))
+	setupRoutes()
 
 	// allows us to shut down server gracefully
 	go func() {
@@ -90,4 +75,29 @@ func main() {
 	}
 
 	fmt.Println("Succesfully Disconnect from MongoDB")
+}
+
+/*
+* Setup routes for echo rest api hear
+ */
+func setupRoutes() {
+	// setup echo instance and routes
+
+	e = echo.New()
+
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.POST("/user", usersController.CreateUser)
+	e.POST("/login", usersController.Login)
+
+	// Put all user paths for editing posts in a group
+	// Only user can modify their posts
+	r := e.Group("/user")
+
+	// set config to read cookie with auth token
+	config := middleware.JWTConfig{
+		SigningKey:  []byte("secret"),
+		TokenLookup: "cookie:token",
+	}
+	r.Use(middleware.JWTWithConfig(config))
 }
