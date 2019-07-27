@@ -29,14 +29,10 @@ func (user *Users) CreateUser(c echo.Context) error {
 		return err
 	}
 
-	// make sure username and password are available
+	// make sure username and password arw in ewquest
 	if len(u.UserName) < 1 || len(u.Password) < 1 {
 		return echo.NewHTTPError(http.StatusBadRequest, "Please provide a user name and password")
 	}
-
-	// attempt to insert into the database
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	// Create a hashed password
 	hashedPW, err := bcrypt.GenerateFromPassword([]byte(u.Password), 14)
@@ -45,9 +41,26 @@ func (user *Users) CreateUser(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
 	}
 
-	res, err := user.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": hashedPW, "email": u.Email})
+	// determine if userName already exists from find count
+	filter := bson.M{"userName": u.UserName}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	//
+	count, cErr := user.Collection.CountDocuments(ctx, filter)
+
+	if cErr != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
+	}
+
+	if count != 0 {
+		return echo.NewHTTPError(http.StatusConflict, "User already exists")
+	}
+
+	// attempt to insert into the database
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	res, err := user.Collection.InsertOne(ctx2, bson.M{"userName": u.UserName, "password": string(hashedPW), "email": u.Email})
+
 	if err != nil {
 		fmt.Println(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
@@ -62,3 +75,13 @@ func (user *Users) CreateUser(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, response)
 }
+
+// Login receives the username and password from from the json request body and determines if the user exist
+// It then compares hashed password, and if successful, returns userName and jwt
+// func (user *Users) Login(c echo.Context) error {
+// 	u := new(model.User)
+
+// 	if err := c.Bind(u); err != nil {
+// 		return err
+// 	}
+// }
