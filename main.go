@@ -43,6 +43,7 @@ func main() {
 	userCollection = client.Database("foodie").Collection("users")
 	usersController = &controller.Users{Collection: userCollection}
 
+	// routes are configured below, main more for setup and teardown
 	setupRoutes()
 
 	// allows us to shut down server gracefully

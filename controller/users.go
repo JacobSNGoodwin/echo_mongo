@@ -98,14 +98,14 @@ func (users *Users) Login(c echo.Context) error {
 	err := users.Collection.FindOne(ctx, bson.M{"userName": u.UserName}).Decode(respData)
 
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Not a valid user or password")
+		return echo.NewHTTPError(http.StatusUnauthorized, "Not a valid user or password")
 	}
 
 	// check password - first arg is hash in db, second is entered from json req
 	err = bcrypt.CompareHashAndPassword([]byte(respData.Password), []byte(u.Password))
 
 	if err != nil {
-		return echo.NewHTTPError(http.StatusOK, "Not a valid user or password")
+		return echo.NewHTTPError(http.StatusUnauthorized, "Not a valid user or password")
 	}
 
 	// Create token
