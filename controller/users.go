@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Maxbrain0/echo_mongo/model"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -107,5 +108,23 @@ func (users *Users) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusOK, "Not a valid user or password")
 	}
 
-	return c.JSON(http.StatusCreated, model.User{ID: respData.ID, UserName: respData.UserName})
+	// Create token
+	token := jwt.New(jwt.SigningMethodHS256)
+	// Set claims
+	claims := token.Claims.(jwt.MapClaims)
+	claims["userName"] = respData.UserName
+	claims["userId"] = respData.ID
+	claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+
+	// Generate encoded token - make sure to store a better secret as env variable
+	t, err := token.SignedString([]byte("secret"))
+	if err != nil {
+		// consider sending a specific message
+		fmt.Println(err)
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"token": t,
+	})
 }
