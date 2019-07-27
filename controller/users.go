@@ -29,16 +29,9 @@ func (user *Users) CreateUser(c echo.Context) error {
 		return err
 	}
 
-	// make sure username and password arw in ewquest
+	// make sure username and password are in request
 	if len(u.UserName) < 1 || len(u.Password) < 1 {
 		return echo.NewHTTPError(http.StatusBadRequest, "Please provide a user name and password")
-	}
-
-	// Create a hashed password
-	hashedPW, err := bcrypt.GenerateFromPassword([]byte(u.Password), 14)
-
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
 	}
 
 	// determine if userName already exists from find count
@@ -54,6 +47,13 @@ func (user *Users) CreateUser(c echo.Context) error {
 
 	if count != 0 {
 		return echo.NewHTTPError(http.StatusConflict, "User already exists")
+	}
+
+	// Create a hashed password
+	hashedPW, err := bcrypt.GenerateFromPassword([]byte(u.Password), 10)
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
 	}
 
 	// attempt to insert into the database
