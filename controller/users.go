@@ -22,7 +22,7 @@ type Users struct {
 }
 
 // CreateUser creates a user in mongo dB and returns a response on success
-func (user *Users) CreateUser(c echo.Context) error {
+func (users *Users) CreateUser(c echo.Context) error {
 	u := new(model.User)
 
 	if err := c.Bind(u); err != nil {
@@ -39,7 +39,7 @@ func (user *Users) CreateUser(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	count, cErr := user.Collection.CountDocuments(ctx, filter)
+	count, cErr := users.Collection.CountDocuments(ctx, filter)
 
 	if cErr != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not add user")
@@ -59,7 +59,7 @@ func (user *Users) CreateUser(c echo.Context) error {
 	// attempt to insert into the database
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel2()
-	res, err := user.Collection.InsertOne(ctx2, bson.M{"userName": u.UserName, "password": string(hashedPW), "email": u.Email})
+	res, err := users.Collection.InsertOne(ctx2, bson.M{"userName": u.UserName, "password": string(hashedPW), "email": u.Email})
 
 	if err != nil {
 		fmt.Println(err)
@@ -78,10 +78,36 @@ func (user *Users) CreateUser(c echo.Context) error {
 
 // Login receives the username and password from from the json request body and determines if the user exist
 // It then compares hashed password, and if successful, returns userName and jwt
-// func (user *Users) Login(c echo.Context) error {
-// 	u := new(model.User)
+func (users *Users) Login(c echo.Context) error {
+	u := new(model.User)
 
-// 	if err := c.Bind(u); err != nil {
-// 		return err
-// 	}
-// }
+	if err := c.Bind(u); err != nil {
+		return err
+	}
+
+	// make sure username and password are in request
+	if len(u.UserName) < 1 || len(u.Password) < 1 {
+		return echo.NewHTTPError(http.StatusBadRequest, "Please provide a user name and password")
+	}
+
+	// find user in db collection
+	respData := &model.User{} // for now bring in all user data... in future might create simpler struct to return less
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := users.Collection.FindOne(ctx, bson.M{"userName": u.UserName}).Decode(respData)
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Not a valid user or password")
+	}
+
+	// check password - first arg is hash in db, second is entered from json req
+	err = bcrypt.CompareHashAndPassword([]byte(respData.Password), []byte(u.Password))
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Not a valid user or password")
+	}
+
+	fmt.Println("Successfully entered password!")
+
+	return nil
+}

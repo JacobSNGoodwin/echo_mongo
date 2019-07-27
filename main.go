@@ -44,6 +44,7 @@ func main() {
 	// we wrap functions that need to pass the collection
 	e := echo.New()
 	e.POST("/user", usersController.CreateUser)
+	e.POST("/login", usersController.Login)
 
 	// allows us to shut down server gracefully
 	go func() {
