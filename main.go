@@ -29,12 +29,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctxDB, cancelDB := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelDB()
 
-	err = client.Connect(ctx)
+	err = client.Connect(ctxDB)
 
 	if err != nil {
+		cancelDB()
 		log.Fatal(err)
 	}
 
@@ -62,9 +63,9 @@ func main() {
 
 	// shut down echo server
 	fmt.Println("Shutting down the echo server...")
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := e.Shutdown(ctx); err != nil {
+	ctxDisconnect, cancelDisconnect := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelDisconnect()
+	if err := e.Shutdown(ctxDisconnect); err != nil {
 		e.Logger.Fatal(err)
 	}
 	fmt.Println("Successfully shut down echo server!")
@@ -72,7 +73,7 @@ func main() {
 	// shut down mongo db
 	fmt.Println("Disconnecting from MongoDB...")
 
-	if err := client.Disconnect(ctx); err != nil {
+	if err := client.Disconnect(ctxDisconnect); err != nil {
 		log.Fatal("Problem shutting down mongodb")
 	}
 
