@@ -58,9 +58,7 @@ func (users *Users) CreateUser(c echo.Context) error {
 	}
 
 	// attempt to insert into the database
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel2()
-	res, err := users.Collection.InsertOne(ctx2, bson.M{"userName": u.UserName, "password": string(hashedPW), "email": u.Email})
+	res, err := users.Collection.InsertOne(ctx, bson.M{"userName": u.UserName, "password": string(hashedPW), "email": u.Email})
 
 	if err != nil {
 		fmt.Println(err)
