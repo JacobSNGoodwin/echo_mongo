@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/Maxbrain0/echo_mongo/controller"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -20,9 +21,11 @@ import (
 var dburi string
 var gcconfig string
 
-// global server, controllers, and collections
+// global server, controllers, collections, and handle to cloud storage
 var e *echo.Echo
+var gcBucket *storage.BucketHandle
 var userCollection *mongo.Collection
+var postCollection *mongo.Collection
 var usersController *controller.Users
 var postsController *controller.Posts
 
@@ -33,6 +36,10 @@ func init() {
 
 	flag.Parse()
 
+	// set Google cloud environment variable from command line
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", gcconfig)
+
+	// fmt.Println(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	// fmt.Println("Starting on the following db uri: ", dburi)
 	// fmt.Println("Using the following Google Cloud Config: ", gcconfig)
 }
@@ -46,21 +53,50 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ctxDB, cancelDB := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelDB()
+	// use this context timeout for both mongo and google cloud storage client
+	// cancel if either fails
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	err = client.Connect(ctxDB)
+	err = client.Connect(ctx)
 
 	if err != nil {
-		cancelDB()
+		cancel()
 		log.Fatal(err)
 	}
 
 	// might want to ping here to really make sure we're connected
 	fmt.Println("Successfully connected to MongoDB!")
 
+	// add a userCollection and postCollection
 	userCollection = client.Database("foodie").Collection("users")
+	postCollection = client.Database("foodie").Collection("posts")
 	usersController = &controller.Users{Collection: userCollection}
+
+	// Setup client connection to google cloud
+	// Sets your Google Cloud Platform project ID.
+	fmt.Println("Setting up Google Cloud Storage bucket (balde, si vos hablas castello)...")
+
+	projectID := "echo-mongo"
+
+	// Creates a client.
+	gcClient, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Sets the name for the new bucket.
+	bucketName := "foodie"
+
+	// Creates a Bucket instance.
+	gcBucket = gcClient.Bucket(bucketName)
+
+	// Creates the new bucket.
+	if err := gcBucket.Create(ctx, projectID, nil); err != nil {
+		log.Fatalf("Failed to create bucket: %v", err)
+	}
+
+	fmt.Printf("Bucket %v created.\n", bucketName)
 
 	// routes are configured below, main more for setup and teardown
 	setupRoutes()
@@ -98,7 +134,7 @@ func main() {
 }
 
 /*
-* Setup routes for echo rest api hear
+* Setup routes for echo rest api here
  */
 func setupRoutes() {
 	// jwt middleware config
@@ -117,7 +153,7 @@ func setupRoutes() {
 	e.POST("/user", usersController.CreateUser)
 	e.POST("/login", usersController.Login)
 
-	// Must have authentication to create a post
+	// Must have authentication to create a post, so apss jwt middleware
 	e.POST("/post", postsController.CreatePost, jwtmw)
 
 }

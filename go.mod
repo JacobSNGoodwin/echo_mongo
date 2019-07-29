@@ -3,7 +3,7 @@ module github.com/Maxbrain0/echo_mongo
 go 1.12
 
 require (
-	cloud.google.com/go v0.43.0 // indirect
+	cloud.google.com/go v0.43.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect

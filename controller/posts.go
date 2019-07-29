@@ -12,7 +12,8 @@ import (
 // Posts holds reference to a database collection and is the receiver of various
 // endpoint controllers which will need mongoDB collection access
 type Posts struct {
-	Collection *mongo.Collection
+	userCollection *mongo.Collection
+	postCollection *mongo.Collection
 }
 
 // CreatePost creates (duh) a post for the current user (set in context from jwt middleware)
