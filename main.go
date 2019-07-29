@@ -86,7 +86,7 @@ func main() {
 	}
 
 	// Sets the name for the new bucket.
-	bucketName := "foodie"
+	bucketName := "echo-mongo-foodie"
 
 	// Creates a Bucket instance.
 	gcBucket = gcClient.Bucket(bucketName)
