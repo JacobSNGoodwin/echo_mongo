@@ -23,7 +23,7 @@ var gcconfig string
 
 // global server, controllers, collections, and handle to cloud storage
 var e *echo.Echo
-var gcBucket *storage.BucketHandle
+var gcClient *storage.Client
 var userCollection *mongo.Collection
 var postCollection *mongo.Collection
 var usersController *controller.Users
@@ -71,35 +71,25 @@ func main() {
 	// add a userCollection and postCollection
 	userCollection = client.Database("foodie").Collection("users")
 	postCollection = client.Database("foodie").Collection("posts")
-	usersController = &controller.Users{Collection: userCollection}
 
 	// Setup client connection to google cloud
 	// Sets your Google Cloud Platform project ID.
-	fmt.Println("Setting up Google Cloud Storage bucket (balde, si vos hablas castello)...")
-
-	projectID := "echo-mongo"
+	fmt.Println("Creating Google Cloud Storage Client")
 
 	// Creates a client.
-	gcClient, err := storage.NewClient(ctx)
+	gcClient, err = storage.NewClient(ctx)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	// Sets the name for the new bucket.
-	bucketName := "echo-mongo-foodie"
-
-	// Creates a Bucket instance.
-	gcBucket = gcClient.Bucket(bucketName)
-
-	// Creates the new bucket.
-	if err := gcBucket.Create(ctx, projectID, nil); err != nil {
-		log.Fatalf("Failed to create bucket: %v", err)
-	}
-
-	fmt.Printf("Bucket %v created.\n", bucketName)
+	fmt.Println("Successfully Created Google Cloud Storage Client")
 
 	// routes are configured below, main more for setup and teardown
 	setupRoutes()
+
+	// Provide global connection clients to controllers
+	usersController = &controller.Users{Collection: userCollection}
+	postsController = &controller.Posts{UserCollection: userCollection, PostCollection: postCollection, StorageClient: gcClient}
 
 	// allows us to shut down server gracefully
 	go func() {
@@ -127,7 +117,7 @@ func main() {
 	fmt.Println("Disconnecting from MongoDB...")
 
 	if err := client.Disconnect(ctxDisconnect); err != nil {
-		log.Fatal("Problem shutting down mongodb")
+		log.Fatal("Problem shutting down mongodb\n")
 	}
 
 	fmt.Println("Succesfully Disconnected from MongoDB")

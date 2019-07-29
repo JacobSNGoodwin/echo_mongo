@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 
+	"cloud.google.com/go/storage"
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
@@ -12,8 +13,9 @@ import (
 // Posts holds reference to a database collection and is the receiver of various
 // endpoint controllers which will need mongoDB collection access
 type Posts struct {
-	userCollection *mongo.Collection
-	postCollection *mongo.Collection
+	UserCollection *mongo.Collection
+	PostCollection *mongo.Collection
+	StorageClient  *storage.Client
 }
 
 // CreatePost creates (duh) a post for the current user (set in context from jwt middleware)
