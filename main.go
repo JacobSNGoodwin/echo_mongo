@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -15,15 +16,31 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// global flags set via command line - an example bash script is included for some reasonable settings
+var dburi string
+var gcconfig string
+
+// global server, controllers, and collections
 var e *echo.Echo
 var userCollection *mongo.Collection
 var usersController *controller.Users
 var postsController *controller.Posts
 
+// init used to parse flags
+func init() {
+	flag.StringVar(&dburi, "dburi", "mongodb://root:example@localhost:27017", "The db of the mongo URI. The default URI for a docker container is included.")
+	flag.StringVar(&gcconfig, "gcconfig", "", "The path of the json config file for Google Cloud Storage. See https://cloud.google.com/storage/docs/reference/libraries#client-libraries-install-go for more information")
+
+	flag.Parse()
+
+	// fmt.Println("Starting on the following db uri: ", dburi)
+	// fmt.Println("Using the following Google Cloud Config: ", gcconfig)
+}
+
 func main() {
 	// setup mongodB client
 	fmt.Println("Establishing connection to MongoDB...")
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://root:example@localhost:27017"))
+	client, err := mongo.NewClient(options.Client().ApplyURI(dburi))
 
 	if err != nil {
 		log.Fatal(err)
@@ -77,7 +94,7 @@ func main() {
 		log.Fatal("Problem shutting down mongodb")
 	}
 
-	fmt.Println("Succesfully Disconnect from MongoDB")
+	fmt.Println("Succesfully Disconnected from MongoDB")
 }
 
 /*
