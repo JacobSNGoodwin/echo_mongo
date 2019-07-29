@@ -17,15 +17,32 @@ type Posts struct {
 
 // CreatePost creates (duh) a post for the current user (set in context from jwt middleware)
 func (posts *Posts) CreatePost(c echo.Context) error {
-	p := new(model.Post)
+	// Key receives an interface, make sure to use type assertion to jwt.Token
+	// like wise, Claims is of type (jwt.MapClaims)... Oh delightful type assertion!
+	// uid := getUID(c)
 
-	if err := c.Bind(p); err != nil {
+	food := c.FormValue("food")
+	description := c.FormValue("description")
+	image, err := c.FormFile("image")
+
+	if err != nil {
 		return err
 	}
 
-	// Key receives an interface, make sure to use type assertion to jwt.Token
-	// like wise, Claims is of type (jwt.MapClaims)... Oh delightful type assertion!
-	claimMap := c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)
+	response := &model.Post{
+		Food:        food,
+		Description: description,
+		FileURI:     image.Filename,
+	}
 
-	return c.String(http.StatusOK, "Thanks,"+claimMap["userName"].(string))
+	return c.JSON(http.StatusOK, response)
+}
+
+// utility functions for getting data from cookie - may want to abstrect to util folder of some sort
+func getUID(c echo.Context) string {
+	return c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["userId"].(string)
+}
+
+func getUserName(c echo.Context) string {
+	return c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["userName"].(string)
 }
