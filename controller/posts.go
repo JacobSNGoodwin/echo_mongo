@@ -32,6 +32,13 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 		return err
 	}
 
+	// Check to make sure we have an image an limit the file sizee
+	mimeTypes := image.Header["Content-Type"]
+
+	if !containsImage(mimeTypes) {
+		return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
+	}
+
 	response := &model.Post{
 		Food:        food,
 		Description: description,
@@ -48,4 +55,14 @@ func getUID(c echo.Context) string {
 
 func getUserName(c echo.Context) string {
 	return c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["userName"].(string)
+}
+
+// function to make sure we have a mime-type of an image (in case of multiple mime-types, which I'm not sure actually happens often)
+func containsImage(s []string) bool {
+	for _, a := range s {
+		if a == "image/jpeg" || a == "image/gif" || a == "image/png" || a == "image/svg+xml" || a == "image/webp" {
+			return true
+		}
+	}
+	return false
 }
