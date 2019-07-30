@@ -1,11 +1,14 @@
 package controller
 
 import (
+	"context"
+	"io"
 	"net/http"
 
 	"cloud.google.com/go/storage"
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -43,6 +46,28 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
 	}
 
+	// open file and send to GC storage
+	f, err := image.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// create unique id for file
+	objectID := uuid.New().String()
+
+	// consider with timeout... need to determine reasonable time for this operation
+	ctx := context.Background()
+
+	wc := posts.StorageClient.Bucket("echo-mongo-foodie").Object(objectID).NewWriter(ctx)
+	if _, err = io.Copy(wc, f); err != nil {
+		return err
+	}
+	if err := wc.Close(); err != nil {
+		return err
+	}
+
+	// prepare and send response
 	response := &model.Post{
 		Food:        food,
 		Description: description,
