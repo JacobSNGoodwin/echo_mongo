@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -131,7 +132,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 // GetUserPosts extracts the user ID from a json web-token, and returns a list of that user's posts
 func (posts *Posts) GetUserPosts(c echo.Context) error {
 	// first get the current user from jwt middleware
-	uid, err := primitive.ObjectIDFromHex(util.GetUID(c)) // as objectID
+	uid, err := primitive.ObjectIDFromHex(util.GetUID(c)) // as ObjectID
 
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not get user credential")
@@ -144,10 +145,10 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 	err = posts.UserCollection.FindOne(dbCtx, bson.M{"_id": uid}).Decode(userResp)
 
 	if err != nil {
+		fmt.Println(err)
+		dbCancel()
 		return echo.NewHTTPError(http.StatusBadRequest, "No user found. Please login")
 	}
 
-	c.JSON(http.StatusOK, userResp)
-
-	return nil
+	return c.JSON(http.StatusOK, userResp.Posts)
 }
