@@ -31,29 +31,53 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// uid := getUID(c)
 
 	// before doing transferring files and such, make sure the user is in the database
+	// cancel context after time out of if erros
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // use this context for all operations
+	defer cancel()
 
+	// get active userID as Object ID
+	currentUserID, convErr := primitive.ObjectIDFromHex(util.GetUID(c))
+
+	if convErr != nil {
+		cancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem storing data")
+	}
+
+	count, err := posts.UserCollection.CountDocuments(ctx, bson.M{"_id": currentUserID})
+
+	if count < 1 || err != nil {
+		// need to think about this status code
+		cancel()
+		return echo.NewHTTPError(http.StatusBadRequest, "User doesn't exist")
+	}
+
+	// get request values
 	title := c.FormValue("title")
 	description := c.FormValue("description")
 	image, err := c.FormFile("image")
 
 	if err != nil {
+		cancel()
 		return err
 	}
 
 	// Check to make sure we have an image an limit the file sizee
 	mimeTypes := image.Header["Content-Type"]
 	if !util.ContainsImage(mimeTypes) {
+		cancel()
 		return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
 	}
 
 	// set a limit on the file size of 10 MB... maybe should be less
 	if image.Size > (1024 * 124 * 10) {
+		cancel()
 		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
 	}
 
 	// open file and send to GC storage
 	f, err := image.Open()
 	if err != nil {
+		cancel()
 		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
 
@@ -62,24 +86,20 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// create unique id for file
 	storageID := uuid.New().String() + "-" + image.Filename
 
-	// consider with timeout... need to determine reasonable time for this operation
-	ctx := context.Background()
-
 	o := posts.StorageClient.Bucket("echo-mongo-foodie").Object(storageID)
 
 	wc := o.NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
+		cancel()
 		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
 	if err := wc.Close(); err != nil {
+		cancel()
 		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
 
 	// create url
 	url := "https://storage.googleapis.com/echo-mongo-foodie/" + storageID
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	// store Post in posts collection, and then add post's storageID to users Posts List
 	d := bson.M{"title": title, "description": description, "publicUrl": url, "storageId": storageID, "user": util.GetUserName(c)}
@@ -92,14 +112,6 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 
 	// store result id in user's posts array
 	oid := result.InsertedID.(primitive.ObjectID)
-
-	// get active userID as Object ID
-	currentUserID, convErr := primitive.ObjectIDFromHex(util.GetUID(c))
-
-	if convErr != nil {
-		cancel()
-		return echo.NewHTTPError(http.StatusInternalServerError, "Problem storing data")
-	}
 
 	// update record of currently authenticated user... add to this user's posts array
 	updateErr := posts.UserCollection.FindOneAndUpdate(ctx, bson.M{"_id": currentUserID}, bson.M{"$addToSet": bson.M{"posts": oid}}).Err()
