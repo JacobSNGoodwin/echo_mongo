@@ -79,17 +79,20 @@ func main() {
 	// Creates a client.
 	gcClient, err = storage.NewClient(ctx)
 	if err != nil {
+		cancel()
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
 	fmt.Println("Successfully Created Google Cloud Storage Client")
 
+	// setup controllers with global references prior to route handling
+	usersController = &controller.Users{Collection: userCollection}
+	postsController = &controller.Posts{UserCollection: userCollection, PostCollection: postCollection, StorageClient: gcClient}
+
 	// routes are configured below, main more for setup and teardown
 	setupRoutes()
 
 	// Provide global connection clients to controllers
-	usersController = &controller.Users{Collection: userCollection}
-	postsController = &controller.Posts{UserCollection: userCollection, PostCollection: postCollection, StorageClient: gcClient}
 
 	// allows us to shut down server gracefully
 	go func() {
