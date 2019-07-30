@@ -145,10 +145,9 @@ func setupRoutes() {
 	e.Use(middleware.Recover())
 	e.POST("/user", usersController.CreateUser)
 	e.POST("/login", usersController.Login)
+	e.GET("/posts", postsController.GetPosts)
 
-	// Must have authentication to create a post, so apss jwt middleware
-	e.POST("/post", postsController.CreatePost, jwtmw)
-
+	// Must have authentication to get, modify, delete user's posts, so pass jwt middleware
 	e.GET("/admin/posts", postsController.GetUserPosts, jwtmw)
-
+	e.POST("/admin/post", postsController.CreatePost, jwtmw)
 }

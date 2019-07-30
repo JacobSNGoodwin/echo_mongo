@@ -197,3 +197,9 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 }
+
+// GetPosts gets all posts that are public
+// Note, currently users don't have public or private post settings, but can in the future
+func (posts *Posts) GetPosts(c echo.Context) error {
+	return c.String(http.StatusOK, "'Tsall good!")
+}
