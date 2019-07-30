@@ -34,9 +34,13 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 
 	// Check to make sure we have an image an limit the file sizee
 	mimeTypes := image.Header["Content-Type"]
-
 	if !containsImage(mimeTypes) {
 		return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
+	}
+
+	// set a limit on the file size of 10 MB... maybe should be less
+	if image.Size > (1024 * 124 * 10) {
+		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
 	}
 
 	response := &model.Post{
