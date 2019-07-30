@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -49,8 +50,9 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// open file and send to GC storage
 	f, err := image.Open()
 	if err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
+
 	defer f.Close()
 
 	// create unique id for file
@@ -59,19 +61,30 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// consider with timeout... need to determine reasonable time for this operation
 	ctx := context.Background()
 
-	wc := posts.StorageClient.Bucket("echo-mongo-foodie").Object(objectID).NewWriter(ctx)
+	o := posts.StorageClient.Bucket("echo-mongo-foodie").Object(objectID)
+
+	wc := o.NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
 	if err := wc.Close(); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
+
+	// get attributes of newly created object to store desired meta data in db
+	attrs, err := o.Attrs(ctx)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+	}
+
+	// store public url and object id in database for future reference
+	fmt.Println(attrs)
 
 	// prepare and send response
 	response := &model.Post{
 		Food:        food,
 		Description: description,
-		FileURI:     image.Filename,
+		PublicURL:   image.Filename,
 	}
 
 	return c.JSON(http.StatusOK, response)
