@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -141,14 +140,40 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer dbCancel()
 
+	// retrieve user's list of post ObjectID's from UserCollection
 	userResp := &model.User{}
 	err = posts.UserCollection.FindOne(dbCtx, bson.M{"_id": uid}).Decode(userResp)
 
 	if err != nil {
-		fmt.Println(err)
 		dbCancel()
 		return echo.NewHTTPError(http.StatusBadRequest, "No user found. Please login")
 	}
 
-	return c.JSON(http.StatusOK, userResp.Posts)
+	// get actual post data from PostCollection
+	cursor, err := posts.PostCollection.Find(dbCtx, bson.M{"_id": bson.M{"$in": userResp.Posts}})
+
+	if err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// decode response into a slice of posts
+	respPosts := []*model.Post{}
+
+	for cursor.Next(dbCtx) {
+		elem := &model.Post{} // type to decode into... dangling preposition! O shame!
+		if err := cursor.Decode(elem); err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+
+		respPosts = append(respPosts, elem)
+	}
+
+	if err := cursor.Err(); err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, respPosts)
 }
