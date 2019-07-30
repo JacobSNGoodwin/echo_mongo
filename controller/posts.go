@@ -157,7 +157,7 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "No user found. Please login")
 	}
 
-	// get actual post data from PostCollection - sort by post date, use limit and skip
+	// get actual post data from PostCollection - default sort, use limit and skip
 	findOptions := options.Find()
 	findOptions.SetLimit(params.Limit)
 	findOptions.SetSkip(params.Skip)
@@ -201,5 +201,60 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 // GetPosts gets all posts that are public
 // Note, currently users don't have public or private post settings, but can in the future
 func (posts *Posts) GetPosts(c echo.Context) error {
-	return c.String(http.StatusOK, "'Tsall good!")
+	// retrieve limit and skip
+	params := new(model.PostList)
+	if err := c.Bind(params); err != nil {
+		return err
+	}
+
+	// get actual post data from PostCollection - use limit and skip
+	findOptions := options.Find()
+	findOptions.SetLimit(params.Limit)
+	findOptions.SetSkip(params.Skip)
+
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer dbCancel()
+
+	// get totall count on collection using metadata since we're not filtering
+	postCount, err := posts.PostCollection.EstimatedDocumentCount(dbCtx)
+
+	// use a find without filters and above FindOptions
+	cursor, err := posts.PostCollection.Find(dbCtx, bson.M{}, findOptions)
+	if err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	if err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// decode response into a slice of posts
+	respPosts := []*model.Post{}
+
+	for cursor.Next(dbCtx) {
+		elem := &model.Post{} // type to decode into... dangling preposition! O shame!
+		if err := cursor.Decode(elem); err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+
+		respPosts = append(respPosts, elem)
+	}
+
+	if err := cursor.Err(); err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// The final response
+	resp := &model.PostList{
+		Posts: respPosts,
+		Total: postCount,
+		Limit: params.Limit,
+		Skip:  params.Skip,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
