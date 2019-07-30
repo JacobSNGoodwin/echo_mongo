@@ -11,3 +11,11 @@ type Post struct {
 	PublicURL   string             `json:"publicUrl,omitempty" bson:"publicUrl,omitempty"`
 	StorageID   string             `json:"storageId,omitempty" bson:"storageId,omitempty"`
 }
+
+// PostList will be used for responses retrieving lists of posts
+type PostList struct {
+	Posts []*Post `json:"posts" bson:"posts"`
+	Total int64   `json:"total" bson:"total"`
+	Limit int64   `json:"limit" bson:"limit"`
+	Skip  int64   `json:"skip" bson:"skip"`
+}

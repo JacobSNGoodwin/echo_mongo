@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Posts holds reference to a database collection and is the receiver of various
@@ -140,7 +141,14 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer dbCancel()
 
-	// retrieve user's list of post ObjectID's from UserCollection
+	// retrieve limit and skip
+	params := new(model.PostList)
+
+	if err := c.Bind(params); err != nil {
+		return err
+	}
+
+	// retrieve user's list of post ObjectID's from UserCollection - need to return total count, too
 	userResp := &model.User{}
 	err = posts.UserCollection.FindOne(dbCtx, bson.M{"_id": uid}).Decode(userResp)
 
@@ -149,8 +157,12 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "No user found. Please login")
 	}
 
-	// get actual post data from PostCollection
-	cursor, err := posts.PostCollection.Find(dbCtx, bson.M{"_id": bson.M{"$in": userResp.Posts}})
+	// get actual post data from PostCollection - sort by post date, use limit and skip
+	findOptions := options.Find()
+	findOptions.SetLimit(params.Limit)
+	findOptions.SetSkip(params.Skip)
+
+	cursor, err := posts.PostCollection.Find(dbCtx, bson.M{"_id": bson.M{"$in": userResp.Posts}}, findOptions)
 
 	if err != nil {
 		dbCancel()
@@ -175,5 +187,13 @@ func (posts *Posts) GetUserPosts(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, respPosts)
+	// The final response
+	resp := &model.PostList{
+		Posts: respPosts,
+		Total: int64(len(userResp.Posts)),
+		Limit: params.Limit,
+		Skip:  params.Skip,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
