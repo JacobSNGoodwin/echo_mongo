@@ -8,4 +8,5 @@ type User struct {
 	UserName string             `json:"userName" xml:"userName" form:"userName" bson:"userName"`
 	Email    string             `json:"email,omitempty" xml:"email,omitempty" form:"email,omitempty" bson:"email,omitempty"`
 	Password string             `json:"password,omitempty" xml:"password,omitempty" form:"password,omitempty" bson:"password, omitempty"`
+	Posts    []string           `json:"posts,omitempty" xml:"posts,omitempty" form:"posts,omitempty" bson:"posts, omitempty"`
 }

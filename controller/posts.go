@@ -2,15 +2,17 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/Maxbrain0/echo_mongo/model"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -28,7 +30,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// like wise, Claims is of type (jwt.MapClaims)... Oh delightful type assertion!
 	// uid := getUID(c)
 
-	food := c.FormValue("food")
+	title := c.FormValue("title")
 	description := c.FormValue("description")
 	image, err := c.FormFile("image")
 
@@ -56,12 +58,12 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	defer f.Close()
 
 	// create unique id for file
-	objectID := uuid.New().String()
+	storageID := uuid.New().String() + "-" + image.Filename
 
 	// consider with timeout... need to determine reasonable time for this operation
 	ctx := context.Background()
 
-	o := posts.StorageClient.Bucket("echo-mongo-foodie").Object(objectID)
+	o := posts.StorageClient.Bucket("echo-mongo-foodie").Object(storageID)
 
 	wc := o.NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
@@ -71,20 +73,42 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 	}
 
-	// get attributes of newly created object to store desired meta data in db
-	attrs, err := o.Attrs(ctx)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+	// create url
+	url := "https://storage.googleapis.com/echo-mongo-foodie/" + storageID
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// store Post in posts collection, and then add post's storageID to users Posts List
+	d := bson.M{"title": title, "description": description, "publicUrl": url, "storageId": storageID, "user": getUserName(c)}
+	result, insErr := posts.PostCollection.InsertOne(ctx, d)
+
+	if insErr != nil {
+		cancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem storing data")
 	}
 
-	// store public url and object id in database for future reference
-	fmt.Println(attrs)
+	// store result id in user's posts array
+	oid := result.InsertedID.(primitive.ObjectID)
 
-	// prepare and send response
+	// get active userID as Object ID
+	currentUserID, convErr := primitive.ObjectIDFromHex(getUID(c))
+
+	if convErr != nil {
+		cancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem storing data")
+	}
+
+	// update record of currently authenticated user... add to this user's posts array
+	updateErr := posts.UserCollection.FindOneAndUpdate(ctx, bson.M{"_id": currentUserID}, bson.M{"$addToSet": bson.M{"posts": oid}}).Err()
+
+	if updateErr != nil {
+		cancel()
+		return echo.NewHTTPError(http.StatusInternalServerError, "Problem storing data")
+	}
+
 	response := &model.Post{
-		Food:        food,
-		Description: description,
-		PublicURL:   image.Filename,
+		ID: oid,
 	}
 
 	return c.JSON(http.StatusOK, response)
