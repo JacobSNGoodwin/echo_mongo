@@ -258,3 +258,9 @@ func (posts *Posts) GetPosts(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 }
+
+// DeletePost retrieves the ID of a post, a deletes it given that the psot belongs
+// to the current user stored in the jwt in the context
+func (posts *Posts) DeletePost(c echo.Context) error {
+	return c.String(http.StatusOK, "Deleting the dadgummed post")
+}

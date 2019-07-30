@@ -150,4 +150,5 @@ func setupRoutes() {
 	// Must have authentication to get, modify, delete user's posts, so pass jwt middleware
 	e.GET("/admin/posts", postsController.GetUserPosts, jwtmw)
 	e.POST("/admin/post", postsController.CreatePost, jwtmw)
+	e.DELETE("/admin/post", postsController.DeletePost, jwtmw)
 }
