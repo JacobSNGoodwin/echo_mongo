@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Maxbrain0/echo_mongo/model"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/Maxbrain0/echo_mongo/util"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,6 +30,8 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// like wise, Claims is of type (jwt.MapClaims)... Oh delightful type assertion!
 	// uid := getUID(c)
 
+	// before doing transferring files and such, make sure the user is in the database
+
 	title := c.FormValue("title")
 	description := c.FormValue("description")
 	image, err := c.FormFile("image")
@@ -40,7 +42,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 
 	// Check to make sure we have an image an limit the file sizee
 	mimeTypes := image.Header["Content-Type"]
-	if !containsImage(mimeTypes) {
+	if !util.ContainsImage(mimeTypes) {
 		return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
 	}
 
@@ -80,7 +82,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	defer cancel()
 
 	// store Post in posts collection, and then add post's storageID to users Posts List
-	d := bson.M{"title": title, "description": description, "publicUrl": url, "storageId": storageID, "user": getUserName(c)}
+	d := bson.M{"title": title, "description": description, "publicUrl": url, "storageId": storageID, "user": util.GetUserName(c)}
 	result, insErr := posts.PostCollection.InsertOne(ctx, d)
 
 	if insErr != nil {
@@ -92,7 +94,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	oid := result.InsertedID.(primitive.ObjectID)
 
 	// get active userID as Object ID
-	currentUserID, convErr := primitive.ObjectIDFromHex(getUID(c))
+	currentUserID, convErr := primitive.ObjectIDFromHex(util.GetUID(c))
 
 	if convErr != nil {
 		cancel()
@@ -114,21 +116,26 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// utility functions for getting data from cookie - may want to abstrect to util folder of some sort
-func getUID(c echo.Context) string {
-	return c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["userId"].(string)
-}
+// GetUserPosts extracts the user ID from a json web-token, and returns a list of that user's posts
+func (posts *Posts) GetUserPosts(c echo.Context) error {
+	// first get the current user from jwt middleware
+	uid, err := primitive.ObjectIDFromHex(util.GetUID(c)) // as objectID
 
-func getUserName(c echo.Context) string {
-	return c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["userName"].(string)
-}
-
-// function to make sure we have a mime-type of an image (in case of multiple mime-types, which I'm not sure actually happens often)
-func containsImage(s []string) bool {
-	for _, a := range s {
-		if a == "image/jpeg" || a == "image/gif" || a == "image/png" || a == "image/svg+xml" || a == "image/webp" {
-			return true
-		}
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not get user credential")
 	}
-	return false
+
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer dbCancel()
+
+	userResp := &model.User{}
+	err = posts.UserCollection.FindOne(dbCtx, bson.M{"_id": uid}).Decode(userResp)
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "No user found. Please login")
+	}
+
+	c.JSON(http.StatusOK, userResp)
+
+	return nil
 }

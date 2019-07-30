@@ -149,4 +149,6 @@ func setupRoutes() {
 	// Must have authentication to create a post, so apss jwt middleware
 	e.POST("/post", postsController.CreatePost, jwtmw)
 
+	e.GET("/admin/posts", postsController.GetUserPosts, jwtmw)
+
 }
