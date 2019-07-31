@@ -73,7 +73,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	}
 
 	// set a limit on the file size of 10 MB... maybe should be less
-	if image.Size > (1024 * 124 * 10) {
+	if image.Size > (1024 * 1024 * 10) {
 		cancel()
 		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
 	}
@@ -331,12 +331,11 @@ func (posts *Posts) DeletePost(c echo.Context) error {
 // EditPost retrieves the ID of a post from url and edits it with data from the request body given that the post belongs
 // to the current user stored in the jwt in the context
 func (posts *Posts) EditPost(c echo.Context) error {
-	// variable in function scope for updating
-	var newTitle string
-	var newDescription string
 	var newImage *multipart.FileHeader
 	var newStorageID string
-	var newPublicURL string
+
+	// we start with empty map and add properties conditionally if they are requested
+	updatedPost := bson.M{}
 
 	// fetch the PostID and make sure it is in the current user's list
 	postID, err := primitive.ObjectIDFromHex(c.Param("id"))
@@ -378,12 +377,13 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		return err
 	}
 
+	// see if values exist on form map - assign to updated post map if this is the case
 	if val, ok := form.Value["title"]; ok {
-		newTitle = val[0]
+		updatedPost["title"] = val[0]
 	}
 
 	if val, ok := form.Value["description"]; ok {
-		newDescription = val[0]
+		updatedPost["description"] = val[0]
 	}
 
 	if val, ok := form.File["image"]; ok {
@@ -400,7 +400,7 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		}
 
 		// set a limit on the file size of 10 MB... maybe should be less
-		if newImage.Size > (1024 * 124 * 10) {
+		if newImage.Size > (1024 * 1024 * 10) {
 			dbCancel()
 			return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
 		}
@@ -445,29 +445,24 @@ func (posts *Posts) EditPost(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
 		}
 
-		// create url
-		newPublicURL = "https://storage.googleapis.com/echo-mongo-foodie/" + newStorageID
+		// add new storage ID and post ID to updatedPost map
+		updatedPost["storageId"] = newStorageID
+		updatedPost["publicUrl"] = "https://storage.googleapis.com/echo-mongo-foodie/" + newStorageID
 	}
 
-	// Having successfully uploaded new file, we can update Post with new fields, make sure empty
-	// Empty strings do not cause an update
-
-	updatedPost := bson.M{
-		"$set": bson.M{
-			"title":       newTitle,
-			"description": newDescription,
-			"publicUrl":   newPublicURL,
-			"storageId":   newStorageID,
-		},
+	// Having successfully uploaded new file, we can update Post with new fields
+	// Use set operator to updated fields added in updatePost map above
+	updatedPostBSON := bson.M{
+		"$set": updatedPost,
 	}
 
 	respPost := &model.Post{}
 
-	// return newly updated docuemtn instead of old one
+	// return newly updated docuemnt instead of old one (the default return value)
 	updateOptions := options.FindOneAndUpdate()
 	updateOptions.SetReturnDocument(options.After)
 
-	err = posts.PostCollection.FindOneAndUpdate(dbCtx, bson.M{"_id": postID}, updatedPost, updateOptions).Decode(respPost)
+	err = posts.PostCollection.FindOneAndUpdate(dbCtx, bson.M{"_id": postID}, updatedPostBSON, updateOptions).Decode(respPost)
 
 	if err != nil {
 		dbCancel()
