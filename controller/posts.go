@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -362,7 +363,62 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Could not modify post for current user.")
 	}
 
-	// modify the post with body content - need to reupload to GoogleCloud if new image
+	// Determine which fields exist in multi-part form data. Only store these values if they're available
+	// get request values
+	form, err := c.MultipartForm()
+	if err != nil {
+		dbCancel()
+		return err
+	}
+
+	var title string
+	var description string
+	var image *multipart.FileHeader
+
+	if val, ok := form.Value["title"]; ok {
+		title = val[0]
+	}
+
+	if val, ok := form.Value["description"]; ok {
+		description = val[0]
+	}
+
+	if val, ok := form.File["image"]; ok {
+		image = val[0]
+	}
+
+	// title := c.FormValue("title")
+	// description := c.FormValue("description")
+	// image, err := c.FormFile("image")
+
+	// if err != nil {
+	// 	fmt.Println("Error parsing file!", err)
+	// 	dbCancel()
+	// 	return err
+	// }
+
+	fmt.Println(title, description, image.Filename)
+
+	// // Check to make sure we have an image an limit the file sizee
+	// mimeTypes := image.Header["Content-Type"]
+	// if !util.ContainsImage(mimeTypes) {
+	// 	dbCancel()
+	// 	return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
+	// }
+
+	// // set a limit on the file size of 10 MB... maybe should be less
+	// if image.Size > (1024 * 124 * 10) {
+	// 	dbCancel()
+	// 	return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
+	// }
+
+	// // open file and send to GC storage
+	// f, err := image.Open()
+	// if err != nil {
+	// 	cancel()
+	// 	return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+	// }
+	// defer f.Close()
 
 	return c.String(http.StatusOK, fmt.Sprintf("UID: %+v, PostID: %+v", uid, postID))
 }
