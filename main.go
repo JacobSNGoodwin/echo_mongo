@@ -20,6 +20,7 @@ import (
 // global flags set via command line - an example bash script is included for some reasonable settings
 var dburi string
 var gcconfig string
+var gcBucket string
 
 // global server, controllers, collections, and handle to cloud storage
 var e *echo.Echo
@@ -33,6 +34,7 @@ var postsController *controller.Posts
 func init() {
 	flag.StringVar(&dburi, "dburi", "mongodb://root:example@localhost:27017", "The db of the mongo URI. The default URI for a docker container is included.")
 	flag.StringVar(&gcconfig, "gcconfig", "", "The path of the json config file for Google Cloud Storage. See https://cloud.google.com/storage/docs/reference/libraries#client-libraries-install-go for more information")
+	flag.StringVar(&gcBucket, "gcbucket", "", "The string-valued name of your google storage bucket")
 
 	flag.Parse()
 
@@ -87,7 +89,7 @@ func main() {
 
 	// setup controllers with global references prior to route handling
 	usersController = &controller.Users{Collection: userCollection}
-	postsController = &controller.Posts{UserCollection: userCollection, PostCollection: postCollection, StorageClient: gcClient}
+	postsController = &controller.Posts{UserCollection: userCollection, PostCollection: postCollection, StorageClient: gcClient, StorageBucket: gcBucket}
 
 	// routes are configured below, main more for setup and teardown
 	setupRoutes()
@@ -151,4 +153,5 @@ func setupRoutes() {
 	e.GET("/admin/posts", postsController.GetUserPosts, jwtmw)
 	e.POST("/admin/post", postsController.CreatePost, jwtmw)
 	e.DELETE("/admin/post/:id", postsController.DeletePost, jwtmw)
+	e.PUT("/admin/post/:id", postsController.EditPost, jwtmw)
 }

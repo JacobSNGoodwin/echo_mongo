@@ -24,6 +24,7 @@ type Posts struct {
 	UserCollection *mongo.Collection
 	PostCollection *mongo.Collection
 	StorageClient  *storage.Client
+	StorageBucket  string
 }
 
 // CreatePost creates (duh) a post for the current user (set in context from jwt middleware)
@@ -88,7 +89,7 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	// create unique id for file
 	storageID := uuid.New().String() + "-" + image.Filename
 
-	o := posts.StorageClient.Bucket("echo-mongo-foodie").Object(storageID)
+	o := posts.StorageClient.Bucket(posts.StorageBucket).Object(storageID)
 
 	wc := o.NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
@@ -286,7 +287,7 @@ func (posts *Posts) DeletePost(c echo.Context) error {
 	defer dbCancel()
 
 	// try to update document for this user by deleting it from their posts list
-	// if there's an error, or this doesn't exist in their posts list, we won't delete
+	// if there's an error, or ObjectID doesn't exist in user's posts list, we won't delete
 	// any items from the Posts collection
 	updateResult, err := posts.UserCollection.UpdateOne(
 		dbCtx,
@@ -324,4 +325,44 @@ func (posts *Posts) DeletePost(c echo.Context) error {
 		"message":          fmt.Sprintf("Successfully removed post with the following id: %v", postID.Hex()),
 		"deletedPostCount": deleteResult.DeletedCount,
 	})
+}
+
+// EditPost retrieves the ID of a post from url and edits it with data from the request body given that the post belongs
+// to the current user stored in the jwt in the context
+func (posts *Posts) EditPost(c echo.Context) error {
+	// fetch the PostID and make sure it is in the current user's list
+	postID, err := primitive.ObjectIDFromHex(c.Param("id"))
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Could not parse provided id. Please provide a valid post id")
+	}
+
+	// check is zero objectID (ie, no id provided by query body or params)
+	if postID.IsZero() {
+		return echo.NewHTTPError(http.StatusBadRequest, "Please provide the document ID as a query parameter, or in the body as 'id'")
+	}
+
+	// get current userID
+	uid, err := primitive.ObjectIDFromHex(util.GetUID(c)) // as ObjectID
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Could not get user credential")
+	}
+
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer dbCancel()
+	// make sure the document exists for this user with CountDocument
+	postCount, err := posts.UserCollection.CountDocuments(dbCtx, bson.M{
+		"_id":   uid,
+		"posts": postID,
+	})
+
+	if postCount < 1 || err != nil {
+		dbCancel()
+		return echo.NewHTTPError(http.StatusBadRequest, "Could not modify post for current user.")
+	}
+
+	// modify the post with body content - need to reupload to GoogleCloud if new image
+
+	return c.String(http.StatusOK, fmt.Sprintf("UID: %+v, PostID: %+v", uid, postID))
 }
