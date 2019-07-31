@@ -331,6 +331,13 @@ func (posts *Posts) DeletePost(c echo.Context) error {
 // EditPost retrieves the ID of a post from url and edits it with data from the request body given that the post belongs
 // to the current user stored in the jwt in the context
 func (posts *Posts) EditPost(c echo.Context) error {
+	// variable in function scope for updating
+	var newTitle string
+	var newDescription string
+	var newImage *multipart.FileHeader
+	var newStorageID string
+	var newPublicURL string
+
 	// fetch the PostID and make sure it is in the current user's list
 	postID, err := primitive.ObjectIDFromHex(c.Param("id"))
 
@@ -350,7 +357,7 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not get user credential")
 	}
 
-	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer dbCancel()
 	// make sure the document exists for this user with CountDocument
 	postCount, err := posts.UserCollection.CountDocuments(dbCtx, bson.M{
@@ -371,54 +378,77 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		return err
 	}
 
-	var title string
-	var description string
-	var image *multipart.FileHeader
-
 	if val, ok := form.Value["title"]; ok {
-		title = val[0]
+		newTitle = val[0]
 	}
 
 	if val, ok := form.Value["description"]; ok {
-		description = val[0]
+		newDescription = val[0]
 	}
 
 	if val, ok := form.File["image"]; ok {
-		image = val[0]
+		newImage = val[0]
 	}
 
-	// title := c.FormValue("title")
-	// description := c.FormValue("description")
-	// image, err := c.FormFile("image")
+	// If an image is available, we need to delete the former image, and upload a new image
+	if newImage != nil {
+		// first verify image is valid type and size
+		mimeTypes := newImage.Header["Content-Type"]
+		if !util.ContainsImage(mimeTypes) {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
+		}
 
-	// if err != nil {
-	// 	fmt.Println("Error parsing file!", err)
-	// 	dbCancel()
-	// 	return err
-	// }
+		// set a limit on the file size of 10 MB... maybe should be less
+		if newImage.Size > (1024 * 124 * 10) {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
+		}
 
-	fmt.Println(title, description, image.Filename)
+		postToUpdate := &model.Post{}
+		err := posts.PostCollection.FindOne(dbCtx, bson.M{"_id": postID}).Decode(postToUpdate)
 
-	// // Check to make sure we have an image an limit the file sizee
-	// mimeTypes := image.Header["Content-Type"]
-	// if !util.ContainsImage(mimeTypes) {
-	// 	dbCancel()
-	// 	return echo.NewHTTPError(http.StatusUnsupportedMediaType, "Image must be of the following file type: jpeg, gif, png, svg, or webp")
-	// }
+		if err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, "Could not update post for current user")
+		}
 
-	// // set a limit on the file size of 10 MB... maybe should be less
-	// if image.Size > (1024 * 124 * 10) {
-	// 	dbCancel()
-	// 	return echo.NewHTTPError(http.StatusRequestEntityTooLarge, "We currently limit the size of image files to 10 Megabytes")
-	// }
+		// get storageID of old image and delete
+		oldStorageID := postToUpdate.StorageID
+		o := posts.StorageClient.Bucket(posts.StorageBucket).Object(oldStorageID)
+		if err := o.Delete(dbCtx); err != nil {
+			dbCancel()
+			return err
+		}
 
-	// // open file and send to GC storage
-	// f, err := image.Open()
-	// if err != nil {
-	// 	cancel()
-	// 	return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
-	// }
-	// defer f.Close()
+		// create a new storage id, and upload file to server
+		newStorageID = uuid.New().String() + "-" + newImage.Filename
+		oUpdate := posts.StorageClient.Bucket(posts.StorageBucket).Object(newStorageID)
+
+		// open file and send to GC storage
+		f, err := newImage.Open()
+		if err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+		}
+
+		defer f.Close()
+
+		wc := oUpdate.NewWriter(dbCtx)
+		if _, err = io.Copy(wc, f); err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+		}
+		if err := wc.Close(); err != nil {
+			dbCancel()
+			return echo.NewHTTPError(http.StatusInternalServerError, "Problem uploading the provided image file")
+		}
+
+		// create url
+		newPublicURL = "https://storage.googleapis.com/echo-mongo-foodie/" + newStorageID
+	}
+
+	// Having successfully uploaded new file, we can update Post with new fields
 
 	return c.String(http.StatusOK, fmt.Sprintf("UID: %+v, PostID: %+v", uid, postID))
 }
