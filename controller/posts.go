@@ -406,6 +406,7 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		}
 
 		postToUpdate := &model.Post{}
+
 		err := posts.PostCollection.FindOne(dbCtx, bson.M{"_id": postID}).Decode(postToUpdate)
 
 		if err != nil {
@@ -448,7 +449,30 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		newPublicURL = "https://storage.googleapis.com/echo-mongo-foodie/" + newStorageID
 	}
 
-	// Having successfully uploaded new file, we can update Post with new fields
+	// Having successfully uploaded new file, we can update Post with new fields, make sure empty
+	// Empty strings do not cause an update
 
-	return c.String(http.StatusOK, fmt.Sprintf("UID: %+v, PostID: %+v", uid, postID))
+	updatedPost := bson.M{
+		"$set": bson.M{
+			"title":       newTitle,
+			"description": newDescription,
+			"publicUrl":   newPublicURL,
+			"storageId":   newStorageID,
+		},
+	}
+
+	respPost := &model.Post{}
+
+	// return newly updated docuemtn instead of old one
+	updateOptions := options.FindOneAndUpdate()
+	updateOptions.SetReturnDocument(options.After)
+
+	err = posts.PostCollection.FindOneAndUpdate(dbCtx, bson.M{"_id": postID}, updatedPost, updateOptions).Decode(respPost)
+
+	if err != nil {
+		dbCancel()
+		return err
+	}
+
+	return c.JSON(http.StatusOK, respPost)
 }
