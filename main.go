@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -154,4 +156,10 @@ func setupRoutes() {
 	e.POST("/admin/post", postsController.CreatePost, jwtmw)
 	e.DELETE("/admin/post/:id", postsController.DeletePost, jwtmw)
 	e.PUT("/admin/post/:id", postsController.EditPost, jwtmw)
+
+	routeData, err := json.MarshalIndent(e.Routes(), "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ioutil.WriteFile("routes.json", routeData, 0644)
 }
