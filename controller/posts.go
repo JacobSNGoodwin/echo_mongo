@@ -103,7 +103,8 @@ func (posts *Posts) CreatePost(c echo.Context) error {
 	}
 
 	// create url
-	url := "https://storage.googleapis.com/echo-mongo-foodie/" + storageID
+	baseURL := "https://storage.googleapis.com/" + posts.StorageBucket + "/"
+	url := baseURL + storageID
 
 	// store Post in posts collection, and then add post's storageID to users Posts List
 	d := bson.M{"title": title, "description": description, "publicUrl": url, "storageId": storageID, "user": util.GetUserName(c)}
@@ -446,8 +447,9 @@ func (posts *Posts) EditPost(c echo.Context) error {
 		}
 
 		// add new storage ID and post ID to updatedPost map
+		baseURL := "https://storage.googleapis.com/" + posts.StorageBucket + "/"
 		updatedPost["storageId"] = newStorageID
-		updatedPost["publicUrl"] = "https://storage.googleapis.com/echo-mongo-foodie/" + newStorageID
+		updatedPost["publicUrl"] = baseURL + newStorageID
 	}
 
 	// Having successfully uploaded new file, we can update Post with new fields

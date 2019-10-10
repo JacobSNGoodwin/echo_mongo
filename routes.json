@@ -1,5 +1,20 @@
 [
   {
+    "method": "GET",
+    "path": "/admin/posts",
+    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).GetUserPosts-fm"
+  },
+  {
+    "method": "POST",
+    "path": "/admin/post",
+    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).CreatePost-fm"
+  },
+  {
+    "method": "DELETE",
+    "path": "/admin/post/:id",
+    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).DeletePost-fm"
+  },
+  {
     "method": "PUT",
     "path": "/admin/post/:id",
     "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).EditPost-fm"
@@ -18,20 +33,5 @@
     "method": "GET",
     "path": "/posts",
     "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).GetPosts-fm"
-  },
-  {
-    "method": "GET",
-    "path": "/admin/posts",
-    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).GetUserPosts-fm"
-  },
-  {
-    "method": "POST",
-    "path": "/admin/post",
-    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).CreatePost-fm"
-  },
-  {
-    "method": "DELETE",
-    "path": "/admin/post/:id",
-    "name": "github.com/Maxbrain0/echo_mongo/controller.(*Posts).DeletePost-fm"
   }
 ]
